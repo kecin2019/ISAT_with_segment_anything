@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -29,9 +28,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-=======
 
 *.pyc
 ISAT/checkpoints/sam_hq_vit_h.pth
 ISAT/checkpoints/mobile_sam.pt
->>>>>>> f6e9b20d71c585e65ea43a3a71b957aadb172d77
