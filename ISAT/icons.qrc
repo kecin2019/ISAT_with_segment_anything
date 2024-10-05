@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="icon">
+    <file>../icons/play-1.svg</file>
+    <file>../icons/play-5.svg</file>
+    <file>../icons/play-all.svg</file>
     <file>../icons/检查_inspection.svg</file>
     <file>../icons/截屏_screenshot-two.svg</file>
     <file>../icons/编辑撰写_writing-fluently.svg</file>
@@ -62,5 +65,6 @@
     <file>../icons/编辑_edit.svg</file>
     <file>../icons/保存硬盘_save-one.svg</file>
     <file>../icons/保存_save.svg</file>
+    <file>../icons/视频_video-two.svg</file>
   </qresource>
 </RCC>
