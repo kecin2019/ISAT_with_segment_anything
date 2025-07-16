@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple, Type
 import torch
 from torch import nn
 
-from ISAT.segment_any.sam2.modeling.sam2_utils import LayerNorm2d, MLP
+from ..sam2_utils import LayerNorm2d, MLP
 
 
 class MaskDecoder(nn.Module):
@@ -247,7 +247,7 @@ class MaskDecoder(nn.Module):
     def _get_stability_scores(self, mask_logits):
         """
         Compute stability scores of the mask logits based on the IoU between upper and
-        lower thresholds, similar to https://github.com/fairinternal/onevision/pull/568.
+        lower thresholds.
         """
         mask_logits = mask_logits.flatten(-2)
         stability_delta = self.dynamic_multimask_stability_delta

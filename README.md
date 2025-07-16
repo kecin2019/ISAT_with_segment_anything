@@ -10,7 +10,7 @@
     <a href='README-cn.md'><b>[中文]</b></a>
     <a href='README.md'><b>[English]</b></a>
 </p>
-<p align='center'><img src="./display/标注.gif" alt="标注.gif"'></p>
+<p align='center'><img src="./display/标注.gif" alt="标注.gif"></p>
 
 Our tool enables interactive use of [segment anything](https://github.com/facebookresearch/segment-anything) for rapid image segmentation with low RAM requirements (optional bf16 mode).
 
@@ -19,7 +19,28 @@ Demo Video：[YouTube](https://www.youtube.com/watch?v=yLdZCPmX-Bc)
 ---
 
 # Features and Installation
+- &#x1F389;: **New**: **Now we support running annotation models on remote server + local GUI operations！** 
 Please refers to our latest [Documentation in English](https://isat-with-segment-anything.readthedocs.io/en/latest/index.html) or [中文文档](https://isat-samzh.readthedocs.io/zh-cn/latest/)
+
+## Install
+- Create a conda environment(recommended, optional)
+```shell
+# create environment
+conda create -n isat_env python=3.8
+
+# activate environment
+conda activate isat_env
+```
+
+- Install
+```shell
+pip install isat-sam
+```
+
+- Run
+```shell
+isat-sam
+```
 
 # Star History
 
@@ -50,8 +71,8 @@ Please refers to our latest [Documentation in English](https://isat-with-segment
   title={{ISAT with Segment Anything: An Interactive Semi-Automatic Annotation Tool}},
   author={Ji, Shuwei and Zhang, Hongyuan},
   url={https://github.com/yatengLG/ISAT_with_segment_anything},
-  note={Updated on 2023-06-03},
-  year={2023},
-  version={1.10}
+  note={Updated on 2025-02-07},
+  year={2024},
+  version={1.33}
 }
 ```

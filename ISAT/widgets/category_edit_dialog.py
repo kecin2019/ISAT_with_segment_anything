@@ -2,7 +2,7 @@
 # @Author  : LG
 
 from PyQt5 import QtWidgets, QtGui, QtCore
-from ISAT.ui.category_choice import Ui_Dialog
+from ISAT.ui.category_edit import Ui_Dialog
 
 
 class CategoryEditDialog(QtWidgets.QDialog, Ui_Dialog):
@@ -13,8 +13,6 @@ class CategoryEditDialog(QtWidgets.QDialog, Ui_Dialog):
         self.mainwindow = mainwindow
         self.scene = scene
         self.polygon = None
-
-        self.lineEdit_group.setValidator(QtGui.QIntValidator(0,1000))
 
         self.listWidget.itemClicked.connect(self.get_category)
         self.pushButton_apply.clicked.connect(self.apply)
@@ -62,19 +60,21 @@ class CategoryEditDialog(QtWidgets.QDialog, Ui_Dialog):
                 self.listWidget.setCurrentItem(item)
 
         if self.polygon is None:
-            self.lineEdit_group.clear()
+            self.spinBox_group.clear()
             self.lineEdit_category.clear()
             self.checkBox_iscrowded.setCheckState(False)
             self.lineEdit_note.clear()
             self.label_layer.setText('{}'.format(''))
+            self.label_area.setText('{}'.format(''))
         else:
             self.lineEdit_category.setText('{}'.format(self.polygon.category))
             self.lineEdit_category.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            self.lineEdit_group.setText('{}'.format(self.polygon.group))
+            self.spinBox_group.setValue(self.polygon.group)
             iscrowd = QtCore.Qt.CheckState.Checked if self.polygon.iscrowd == 1 else QtCore.Qt.CheckState.Unchecked
             self.checkBox_iscrowded.setCheckState(iscrowd)
             self.lineEdit_note.setText('{}'.format(self.polygon.note))
             self.label_layer.setText('{}'.format(self.polygon.zValue()))
+            self.label_area.setText('{:.0f}{}'.format(self.polygon.area, '' if self.mainwindow.cfg['software']['real_time_area'] else '(no real time)'))
         if self.listWidget.count() == 0:
             QtWidgets.QMessageBox.warning(self, 'Warning', 'Please set categorys before tagging.')
 
@@ -86,7 +86,8 @@ class CategoryEditDialog(QtWidgets.QDialog, Ui_Dialog):
 
     def apply(self):
         category = self.lineEdit_category.text()
-        group = int(self.lineEdit_group.text())
+        group = self.spinBox_group.value()
+
         is_crowd = int(self.checkBox_iscrowded.isChecked())
         note = self.lineEdit_note.text()
         if not category:

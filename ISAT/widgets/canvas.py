@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 # @Author  : LG
-
-from PyQt5 import QtWidgets, QtGui, QtCore
-from ISAT.widgets.polygon import Polygon, Vertex, PromptPoint, Line
-from ISAT.configs import STATUSMode, CLICKMode, DRAWMode, CONTOURMode
 from PIL import Image
+from PyQt5 import QtWidgets, QtGui, QtCore
+from ISAT.widgets.polygon import Polygon, Vertex, PromptPoint, Line, Rect
+from ISAT.configs import STATUSMode, CLICKMode, DRAWMode, CONTOURMode
 import numpy as np
 import cv2
 import time  # 拖动鼠标描点
 import shapely
-
-
-
 
 
 class AnnotationScene(QtWidgets.QGraphicsScene):
@@ -22,6 +18,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mask_item: QtWidgets.QGraphicsPixmapItem = None
         self.image_data = None
         self.current_graph: Polygon = None
+        self.current_sam_rect: Rect = None
         self.current_line: Line = None
         self.mode = STATUSMode.VIEW
         self.click = CLICKMode.POSITIVE
@@ -54,8 +51,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         if self.mainwindow.use_segment_anything:
             self.mainwindow.segany.reset_image()
 
-        self.image_data = np.array(Image.open(image_path))
-
+        self.image_data = np.array(Image.open(image_path).convert('RGB'))
         self.image_item = QtWidgets.QGraphicsPixmapItem()
         self.image_item.setZValue(0)
         self.addItem(self.image_item)
@@ -81,10 +77,11 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mode = STATUSMode.CREATE
         if self.image_item is not None:
             self.image_item.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.CrossCursor))
-        self.mainwindow.actionPrev.setEnabled(False)
-        self.mainwindow.actionNext.setEnabled(False)
+        self.mainwindow.actionPrev_image.setEnabled(False)
+        self.mainwindow.actionNext_image.setEnabled(False)
 
-        self.mainwindow.actionSegment_anything.setEnabled(False)
+        self.mainwindow.actionSegment_anything_point.setEnabled(False)
+        self.mainwindow.actionSegment_anything_box.setEnabled(False)
         self.mainwindow.actionPolygon.setEnabled(False)
         self.mainwindow.actionBackspace.setEnabled(True)
         self.mainwindow.actionFinish.setEnabled(True)
@@ -102,9 +99,8 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mainwindow.actionSave.setEnabled(False)
         self.mainwindow.actionVisible.setEnabled(True)
 
-        self.mainwindow.set_labels_visible(False)
         self.mainwindow.annos_dock_widget.setEnabled(False)
-        self.mainwindow.polygon_repaint_shortcut.setEnabled(False)
+        self.mainwindow.actionRepaint.setEnabled(False)
 
         self.mainwindow.modeState.setText('C')
         self.mainwindow.modeState.setStatusTip(QtCore.QCoreApplication.translate('MainWindow', 'Create mode.'))
@@ -119,8 +115,8 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         if self.image_item is not None:
             self.image_item.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.ArrowCursor))
 
-        self.mainwindow.actionPrev.setEnabled(True)
-        self.mainwindow.actionNext.setEnabled(True)
+        self.mainwindow.actionPrev_image.setEnabled(True)
+        self.mainwindow.actionNext_image.setEnabled(True)
         self.mainwindow.SeganyEnabled()
         self.mainwindow.actionPolygon.setEnabled(self.mainwindow.can_be_annotated)
         self.mainwindow.actionBackspace.setEnabled(False)
@@ -138,9 +134,8 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mainwindow.actionDelete.setEnabled(False)
         self.mainwindow.actionSave.setEnabled(self.mainwindow.can_be_annotated)
         self.mainwindow.actionVisible.setEnabled(True)
-        self.mainwindow.polygon_repaint_shortcut.setEnabled(True)
+        self.mainwindow.actionRepaint.setEnabled(True)
 
-        self.mainwindow.set_labels_visible(True)
         self.mainwindow.annos_dock_widget.setEnabled(True)
 
         self.mainwindow.modeState.setText('V')
@@ -156,10 +151,11 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         if self.image_item is not None:
             self.image_item.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.CrossCursor))
 
-        self.mainwindow.actionPrev.setEnabled(False)
-        self.mainwindow.actionNext.setEnabled(False)
+        self.mainwindow.actionPrev_image.setEnabled(False)
+        self.mainwindow.actionNext_image.setEnabled(False)
 
-        self.mainwindow.actionSegment_anything.setEnabled(False)
+        self.mainwindow.actionSegment_anything_point.setEnabled(False)
+        self.mainwindow.actionSegment_anything_box.setEnabled(False)
         self.mainwindow.actionPolygon.setEnabled(False)
         self.mainwindow.actionBackspace.setEnabled(False)
         self.mainwindow.actionFinish.setEnabled(False)
@@ -176,7 +172,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mainwindow.actionDelete.setEnabled(True)
         self.mainwindow.actionSave.setEnabled(True)
         self.mainwindow.actionVisible.setEnabled(True)
-        self.mainwindow.polygon_repaint_shortcut.setEnabled(False)
+        self.mainwindow.actionRepaint.setEnabled(False)
 
         self.mainwindow.modeState.setText('E')
         self.mainwindow.modeState.setStatusTip(QtCore.QCoreApplication.translate('MainWindow', 'Edit mode.'))
@@ -190,17 +186,18 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.mode = STATUSMode.REPAINT
         self.repaint_start_vertex = None
         self.repaint_end_vertex = None
-
-        self.current_line = Line()  # 重绘部分，由起始点开始的线段显示
-        self.addItem(self.current_line)
+        if self.current_line is None:
+            self.current_line = Line()  # 重绘部分，由起始点开始的线段显示
+            self.addItem(self.current_line)
 
         if self.image_item is not None:
             self.image_item.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.CrossCursor))
 
-        self.mainwindow.actionPrev.setEnabled(False)
-        self.mainwindow.actionNext.setEnabled(False)
+        self.mainwindow.actionPrev_image.setEnabled(False)
+        self.mainwindow.actionNext_image.setEnabled(False)
 
-        self.mainwindow.actionSegment_anything.setEnabled(False)
+        self.mainwindow.actionSegment_anything_point.setEnabled(False)
+        self.mainwindow.actionSegment_anything_box.setEnabled(False)
         self.mainwindow.actionPolygon.setEnabled(False)
         self.mainwindow.actionBackspace.setEnabled(True)
         self.mainwindow.actionFinish.setEnabled(False)
@@ -245,6 +242,10 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         self.draw_mode = DRAWMode.SEGMENTANYTHING
         self.start_draw()
 
+    def start_segment_anything_box(self):
+        self.draw_mode = DRAWMode.SEGMENTANYTHING_BOX
+        self.start_draw()
+
     def start_draw_polygon(self):
         self.draw_mode = DRAWMode.POLYGON
         self.start_draw()
@@ -255,6 +256,9 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             return
         # 否则，切换到绘图模式
         self.change_mode_to_create()
+        if self.mainwindow.cfg['software']['create_mode_invisible_polygon']:
+            self.mainwindow.set_labels_visible(False)
+
         # 绘图模式
         if self.mode == STATUSMode.CREATE:
             self.current_graph = Polygon()
@@ -265,14 +269,12 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         if self.current_graph is None:
             return
 
-        self.change_mode_to_view()
-
         category = self.mainwindow.current_category
         group = self.mainwindow.current_group
         is_crowd = False
         note = ''
 
-        if self.draw_mode == DRAWMode.SEGMENTANYTHING:
+        if self.draw_mode == DRAWMode.SEGMENTANYTHING or self.draw_mode == DRAWMode.SEGMENTANYTHING_BOX:
             # mask to polygon
             # --------------
             if self.masks is not None:
@@ -307,6 +309,8 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                         continue
                     for point in contour:
                         x, y = point[0]
+                        x = max(0.1, x)
+                        y = max(0.1, y)
                         self.current_graph.addPoint(QtCore.QPointF(x, y))
 
                     if self.contour_mode == CONTOURMode.SAVE_ALL and hierarchy[0][index][3] != -1:
@@ -326,6 +330,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
 
                     # 添加新polygon
                     self.mainwindow.polygons.append(self.current_graph)
+                    self.mainwindow.annos_dock_widget.listwidget_add_polygon(self.current_graph)
                     # 设置为最高图层
                     self.current_graph.setZValue(len(self.mainwindow.polygons))
                     for vertex in self.current_graph.vertexs:
@@ -346,7 +351,11 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             if len(self.current_graph.points) < 2:
                 self.current_graph.delete()
                 self.removeItem(self.current_graph)
+
                 self.change_mode_to_view()
+                if self.mainwindow.cfg['software']['create_mode_invisible_polygon']:
+                    self.mainwindow.set_labels_visible(True)
+
                 return
 
             # 两点，默认矩形
@@ -370,6 +379,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                 self.mainwindow.categories_dock_widget.lineEdit_currentGroup.setText(str(self.mainwindow.current_group))
             # 添加新polygon
             self.mainwindow.polygons.append(self.current_graph)
+            self.mainwindow.annos_dock_widget.listwidget_add_polygon(self.current_graph)
             # 设置为最高图层
             self.current_graph.setZValue(len(self.mainwindow.polygons))
             for vertex in self.current_graph.vertexs:
@@ -378,10 +388,16 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
         # self.mainwindow.category_choice_widget.load_cfg()
         # self.mainwindow.category_choice_widget.show()
 
-        self.mainwindow.annos_dock_widget.update_listwidget()
-
         self.current_graph = None
+
+        if self.current_sam_rect is not None:
+            self.current_sam_rect.delete()
+            self.removeItem(self.current_sam_rect)
+            self.current_sam_rect = None
+
         self.change_mode_to_view()
+        if self.mainwindow.cfg['software']['create_mode_invisible_polygon']:
+            self.mainwindow.set_labels_visible(True)
 
         # mask清空
         self.click_points.clear()
@@ -409,7 +425,14 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             for item in self.selectedItems():
                 item.setSelected(False)
 
+        if self.current_sam_rect is not None:
+            self.current_sam_rect.delete()
+            self.removeItem(self.current_sam_rect)
+            self.current_sam_rect = None
+
         self.change_mode_to_view()
+        if self.mainwindow.cfg['software']['create_mode_invisible_polygon']:
+            self.mainwindow.set_labels_visible(True)
 
         self.click_points.clear()
         self.click_points_mode.clear()
@@ -429,6 +452,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                 if item in self.selected_polygons_list:
                     self.selected_polygons_list.remove(item)
                 self.mainwindow.polygons.remove(item)
+                self.mainwindow.annos_dock_widget.listwidget_remove_polygon(item)
                 item.delete()
                 self.removeItem(item)
                 deleted_layer = item.zValue()
@@ -445,6 +469,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                 if len(polygon.vertexs) < 3:
                     if polygon in self.mainwindow.polygons:
                         self.mainwindow.polygons.remove(polygon)
+                        self.mainwindow.annos_dock_widget.listwidget_remove_polygon(polygon)
                         polygon.delete()
                     if polygon in self.items():
                         self.removeItem(polygon)
@@ -455,7 +480,6 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             for p in self.mainwindow.polygons:
                 if p.zValue() > deleted_layer:
                     p.setZValue(p.zValue() - 1)
-            self.mainwindow.annos_dock_widget.update_listwidget()
 
     def edit_polygon(self):
         selectd_items = self.selectedItems()
@@ -521,7 +545,8 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
 
                 self.current_graph.set_drawed(item.category, item.group, item.iscrowd, item.note, item.color, item.zValue())
                 self.mainwindow.polygons.insert(index, self.current_graph)
-                self.mainwindow.annos_dock_widget.update_listwidget()
+                self.mainwindow.annos_dock_widget.listwidget_add_polygon(self.current_graph)
+                item.setSelected(False)
                 self.current_graph.setSelected(True)
                 self.current_graph = None
             elif isinstance(item, Vertex):
@@ -762,9 +787,17 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                     self.click_points.append([sceneX, sceneY])
                     self.click_points_mode.append(1)
                     prompt_point = PromptPoint(QtCore.QPointF(sceneX, sceneY), 1)
-                    prompt_point.setVisible(self.mainwindow.show_prompt.checked)
+                    prompt_point.setVisible(self.mainwindow.cfg['software']['show_prompt'])
                     self.prompt_points.append(prompt_point)
                     self.addItem(prompt_point)
+
+                elif self.draw_mode == DRAWMode.SEGMENTANYTHING_BOX:   # sam 矩形框提示
+                    if self.current_sam_rect is None:
+                        self.current_sam_rect = Rect()
+                        self.current_sam_rect.setZValue(2)
+                        self.addItem(self.current_sam_rect)
+                        self.current_sam_rect.addPoint(QtCore.QPointF(sceneX, sceneY))
+                        self.current_sam_rect.addPoint(QtCore.QPointF(sceneX, sceneY))
 
                 elif self.draw_mode == DRAWMode.POLYGON:
                     # 移除随鼠标移动的点
@@ -780,12 +813,16 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                     self.click_points.append([sceneX, sceneY])
                     self.click_points_mode.append(0)
                     prompt_point = PromptPoint(QtCore.QPointF(sceneX, sceneY), 0)
-                    prompt_point.setVisible(self.mainwindow.show_prompt.checked)
+                    prompt_point.setVisible(self.mainwindow.cfg['software']['show_prompt'])
                     self.prompt_points.append(prompt_point)
                     self.addItem(prompt_point)
 
                 elif self.draw_mode == DRAWMode.POLYGON:
                     pass
+                elif self.draw_mode == DRAWMode.SEGMENTANYTHING_BOX:
+                    try:
+                        self.finish_draw()
+                    except: pass
                 else:
                     raise ValueError('The draw mode named {} not supported.')
             if self.draw_mode == DRAWMode.SEGMENTANYTHING:
@@ -827,10 +864,14 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
                     distance = abs(repaint_end_index - repaint_start_index)
                     if len(repaint_polygon.vertexs) - distance < distance:
                         # 替换两端的点
-                        points = repaint_polygon.points[repaint_start_index+1: repaint_end_index] + replace_points[::-1]
+                        points = ([vertex.pos() for vertex in
+                                  repaint_polygon.vertexs[repaint_start_index + 1: repaint_end_index]]
+                                  + replace_points[::-1])
                     else:
                         # 替换中间的点
-                        points = repaint_polygon.points[:repaint_start_index] + replace_points + repaint_polygon.points[repaint_end_index+1:]
+                        points = ([vertex.pos() for vertex in repaint_polygon.vertexs[:repaint_start_index]] +
+                                  replace_points +
+                                  [vertex.pos() for vertex in repaint_polygon.vertexs[repaint_end_index + 1:]])
                     repaint_polygon.delete()
                     for point in points:
                         repaint_polygon.addPoint(point)
@@ -838,6 +879,7 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
 
                     self.current_line.delete()  # 清除所有路径
                     self.removeItem(self.current_line)
+                    self.current_line = None
 
                     self.repaint_start_vertex = None
                     self.repaint_end_vertex = None
@@ -880,17 +922,25 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             if self.draw_mode == DRAWMode.POLYGON:
                 # 随鼠标位置实时更新多边形
                 self.current_graph.movePoint(len(self.current_graph.points) - 1, pos)
+            if self.draw_mode == DRAWMode.SEGMENTANYTHING_BOX:
+                if self.current_sam_rect is not None:
+                    self.current_sam_rect.movePoint(len(self.current_sam_rect.points) - 1, pos)
+                    self.update_mask()
 
         if self.mode == STATUSMode.REPAINT:
             self.current_line.movePoint(len(self.current_line.points) - 1, pos)
 
+        pen = QtGui.QPen()
+        pen.setStyle(QtCore.Qt.PenStyle.DashLine)
         # 辅助线
         if self.guide_line_x is None and self.width() > 0 and self.height() > 0:
             self.guide_line_x = QtWidgets.QGraphicsLineItem(QtCore.QLineF(pos.x(), 0, pos.x(), self.height()))
+            self.guide_line_x.setPen(pen)
             self.guide_line_x.setZValue(1)
             self.addItem(self.guide_line_x)
         if self.guide_line_y is None and self.width() > 0 and self.height() > 0:
             self.guide_line_y = QtWidgets.QGraphicsLineItem(QtCore.QLineF(0, pos.y(), self.width(), pos.y()))
+            self.guide_line_y.setPen(pen)
             self.guide_line_y.setZValue(1)
             self.addItem(self.guide_line_y)
 
@@ -955,21 +1005,33 @@ class AnnotationScene(QtWidgets.QGraphicsScene):
             mask_image = masks.reshape(h, w, 1) * color.reshape(1, 1, -1)
             mask_image = mask_image.astype("uint8")
             mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2RGB)
+            mask_image = cv2.addWeighted(self.image_data, self.mask_alpha, mask_image, 1, 0)
+        elif self.current_sam_rect is not None:
+            point1 = self.current_sam_rect.points[0]
+            point2 = self.current_sam_rect.points[1]
+            box = np.array([min(point1.x(), point2.x()),
+                            min(point1.y(), point2.y()),
+                            max(point1.x(), point2.x()),
+                            max(point1.y(), point2.y()),
+                            ])
+            masks = self.mainwindow.segany.predict_with_box_prompt(box)
+
+            self.masks = masks
+            color = np.array([0, 0, 255])
+            h, w = masks.shape[-2:]
+            mask_image = masks.reshape(h, w, 1) * color.reshape(1, 1, -1)
+            mask_image = mask_image.astype("uint8")
+            mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2RGB)
             # 这里通过调整原始图像的权重self.mask_alpha，来调整mask的明显程度。
             mask_image = cv2.addWeighted(self.image_data, self.mask_alpha, mask_image, 1, 0)
-            mask_image = QtGui.QImage(mask_image[:], mask_image.shape[1], mask_image.shape[0], mask_image.shape[1] * 3,
-                                      QtGui.QImage.Format_RGB888)
-            mask_pixmap = QtGui.QPixmap(mask_image)
-            if self.mask_item is not None:
-                self.mask_item.setPixmap(mask_pixmap)
         else:
             mask_image = np.zeros(self.image_data.shape, dtype=np.uint8)
             mask_image = cv2.addWeighted(self.image_data, 1, mask_image, 0, 0)
-            mask_image = QtGui.QImage(mask_image[:], mask_image.shape[1], mask_image.shape[0], mask_image.shape[1] * 3,
-                                      QtGui.QImage.Format_RGB888)
-            mask_pixmap = QtGui.QPixmap(mask_image)
-            if self.mask_item is not None:
-                self.mask_item.setPixmap(mask_pixmap)
+        mask_image = QtGui.QImage(mask_image[:], mask_image.shape[1], mask_image.shape[0], mask_image.shape[1] * 3,
+                                  QtGui.QImage.Format_RGB888)
+        mask_pixmap = QtGui.QPixmap(mask_image)
+        if self.mask_item is not None:
+            self.mask_item.setPixmap(mask_pixmap)
 
     def backspace(self):
         if self.mode == STATUSMode.CREATE:
@@ -1004,6 +1066,10 @@ class AnnotationView(QtWidgets.QGraphicsView):
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
         self.factor = 1.2
+
+        # 影响了窗口截图功能，暂时注释掉
+        # self.setViewport(QtWidgets.QOpenGLWidget())
+        # self.setRenderHint(QtGui.QPainter.Antialiasing, False)
 
     def wheelEvent(self, event: QtGui.QWheelEvent):
         angel = event.angleDelta()

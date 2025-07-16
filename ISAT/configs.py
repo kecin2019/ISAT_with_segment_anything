@@ -6,6 +6,7 @@ ISAT_ROOT = os.path.split(os.path.abspath(__file__))[0]
 SOFTWARE_CONFIG_FILE = os.path.join(ISAT_ROOT, 'software.yaml')
 CONFIG_FILE = os.path.join(ISAT_ROOT, 'isat.yaml')
 CHECKPOINT_PATH = os.path.join(ISAT_ROOT, 'checkpoints')
+SHORTCUT_FILE = os.path.join(ISAT_ROOT, 'shortcut.yaml')
 
 os.makedirs(os.path.join(CHECKPOINT_PATH, 'tmp'), exist_ok=True)
 
@@ -23,8 +24,8 @@ def load_config(file):
     return cfg
 
 def save_config(cfg, file):
-    s = yaml.dump(cfg)
-    with open(file, 'w') as f:
+    s = yaml.dump(cfg, allow_unicode=True)
+    with open(file, 'w', encoding='utf-8') as f:
         f.write(s)
     return True
 
@@ -37,6 +38,7 @@ class STATUSMode(Enum):
 class DRAWMode(Enum):
     POLYGON = 0
     SEGMENTANYTHING = 1
+    SEGMENTANYTHING_BOX = 2
 
 class CLICKMode(Enum):
     POSITIVE = 0

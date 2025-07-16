@@ -9,11 +9,10 @@ import platform
 from PIL import Image
 from collections import OrderedDict
 import os
-from skimage.draw.draw import polygon
 from ISAT.segment_any.sam2.utils.misc import AsyncVideoFrameLoader
 
-
 osplatform = platform.system()
+
 
 class SegAny:
     def __init__(self, checkpoint:str, use_bfloat16:bool=True):
@@ -76,18 +75,19 @@ class SegAny:
             from ISAT.segment_any.sam2.sam2_image_predictor import SAM2ImagePredictor as SamPredictor
             # sam2
             if 'hiera_tiny' in checkpoint:
-                self.model_type = "sam2_hiera_tiny"
+                model_type = "hiera_tiny"
             elif 'hiera_small' in checkpoint:
-                self.model_type = "sam2_hiera_small"
+                model_type = "hiera_small"
             elif 'hiera_base_plus' in checkpoint:
-                self.model_type = 'sam2_hiera_base_plus'
+                model_type = 'hiera_base_plus'
             elif 'hiera_large' in checkpoint:
-                self.model_type = 'sam2_hiera_large'
+                model_type = 'hiera_large'
             else:
                 raise ValueError('The checkpoint named {} is not supported.'.format(checkpoint))
-            self.model_source = 'sam2'
-            # sam2 在float32下运行时存在报错，暂时只在bfloat16下运行
-            # self.model_dtype = torch.bfloat16
+            # sam2.1 or sam2
+            model_source = 'sam2.1' if 'sam2.1' in checkpoint else 'sam2'
+            self.model_type = "{}_{}".format(model_source, model_type)
+            self.model_source = model_source
 
         elif 'med2d' in checkpoint:
             from ISAT.segment_any.segment_anything_med2d import sam_model_registry
@@ -112,7 +112,7 @@ class SegAny:
         self.image = None
 
     def set_image(self, image):
-        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype):
+        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype, enabled=torch.cuda.is_available()):
             self.image = image
             self.predictor_with_point_prompt.set_image(image)
 
@@ -122,7 +122,7 @@ class SegAny:
         torch.cuda.empty_cache()
 
     def predict_with_point_prompt(self, input_point, input_label):
-        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype):
+        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype, enabled=torch.cuda.is_available()):
 
             if 'sam2' not in self.model_type:
                 input_point = np.array(input_point)
@@ -150,7 +150,7 @@ class SegAny:
             return masks
 
     def predict_with_box_prompt(self, box):
-        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype):
+        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype, enabled=torch.cuda.is_available()):
             masks, scores, logits = self.predictor_with_point_prompt.predict(
                 box=box,
                 multimask_output=False,
@@ -174,16 +174,20 @@ class SegAnyVideo:
             from ISAT.segment_any.sam2.build_sam import sam_model_registry
             # sam2
             if 'hiera_tiny' in checkpoint:
-                self.model_type = "sam2_hiera_video_tiny"
+                model_type = "hiera_tiny"
             elif 'hiera_small' in checkpoint:
-                self.model_type = "sam2_hiera_video_small"
+                model_type = "hiera_small"
             elif 'hiera_base_plus' in checkpoint:
-                self.model_type = 'sam2_hiera_video_base_plus'
+                model_type = 'hiera_base_plus'
             elif 'hiera_large' in checkpoint:
-                self.model_type = 'sam2_hiera_video_large'
+                model_type = 'hiera_large'
             else:
                 raise ValueError('The checkpoint named {} is not supported.'.format(checkpoint))
-            self.model_source = 'sam2'
+
+            # sam2.1 or sam2
+            model_source = 'sam2.1' if 'sam2.1' in checkpoint else 'sam2'
+            self.model_type = "{}_{}_video".format(model_source, model_type)
+            self.model_source = model_source
 
         torch.cuda.empty_cache()
 
@@ -205,7 +209,7 @@ class SegAnyVideo:
             offload_state_to_cpu=True,
             async_loading_frames=False,
     ):
-        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype):
+        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype, enabled=torch.cuda.is_available()):
 
             img_mean = (0.485, 0.456, 0.406)
             img_std = (0.229, 0.224, 0.225)
@@ -337,7 +341,7 @@ class SegAnyVideo:
         return img, video_height, video_width
 
     def add_new_mask(self, frame_idx, ann_obj_id, mask):
-        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype):
+        with torch.inference_mode(), torch.autocast(self.device, dtype=self.model_dtype, enabled=torch.cuda.is_available()):
             self.predictor.add_new_mask(
                 inference_state=self.inference_state,
                 frame_idx=frame_idx,
